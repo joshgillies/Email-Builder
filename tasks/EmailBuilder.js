@@ -33,22 +33,16 @@ module.exports = function(grunt) {
     var options = helpers.options(this),
         files = this.data.files,
         basepath = options.basepath,
-        done = this.async;
-
-    //console.log(this)
+        done = this.async();
 
     this.files = helpers.normalizeMultiTaskFiles(this.data, this.target);
 
-    console.log(helpers.findBasePath(this.files, this.target));
-
     grunt.util.async.forEachSeries(this.files, function(file, next) {
       var inline_css = file.src,
-          html = file.dest,
-          output = grunt.file.read(html), // HTML
-          inline = grunt.file.read(inline_css); // CSS to be inline;
+          html = file.dest;
 
-      console.log(inline_css);
-      console.log(html);
+      // console.log(inline_css);
+      // console.log(html);
 
       less.render(inline, function (e, css) {
          inline = css;
@@ -62,9 +56,9 @@ module.exports = function(grunt) {
       var basename = path.basename(html)
       grunt.file.write(basepath + basename, output);
 
-    //   // If a second Css file is provided this will be added in as a style tag.
-    //   if(css[1])
-    //     var style = grunt.file.read(css[1], 'utf8');
+      // If a second Css file is provided this will be added in as a style tag.
+      //   if(css[1])
+      //     var style = grunt.file.read(css[1], 'utf8');
 
       // Js dom - Might use this to sniff out the style pathways for css. Gets title atm
       var document = jsdom.html(output),
@@ -72,25 +66,34 @@ module.exports = function(grunt) {
           date = String(Math.round(new Date().getTime() / 1000)),
           title = document.title+' '+date;
 
-
       if (options.litmus) {
-        //grunt.util.async.series([
-          sendLitmus(output, title, function(){
-            console.log();
-            next()
-          })
-        //]);
+
+        var cm = require('child_process').exec,
+            fs = require('fs');
+
+        var command = sendLitmus(output, title);
+
+        console.log(command)
+        cm(command, function(err, stdout, stderr) {
+          if (err || stderr) { console.log(err || stderr, stdout)}
+
+          // Delete XML After being curl'd
+          fs.unlinkSync('data.xml');
+          next();
+        });
+
       } else {
         next();
       }
 
+    }, function() {
+      done()
     });
 
-    function sendLitmus(data, title, callback) {
+    function sendLitmus(data, title) {
       // Write the data xml file to curl, prolly can get rid of this somehow.
 
       var xml = xmlBuild(data, title);
-
 
       grunt.file.write('data.xml', xml);
 
@@ -100,18 +103,7 @@ module.exports = function(grunt) {
 
       var command = 'curl -i -X POST -u '+username+':'+password+' -H \'Accept: application/xml\' -H \'Content-Type: application/xml\' '+accountUrl+'/emails.xml -d @data.xml';
 
-      var cm = require('child_process').exec,
-          fs = require('fs');
-
-      cm(command, function(err, stdout, stderr) {
-        if (err || stderr) { console.log(err || stderr, stdout)}
-
-        // Delete XML After being curl'd
-        fs.unlinkSync('data.xml');
-        done();
-      });
-
-      callback(null, 'Done');
+      return command;
     }
 
     //Application XMl Builder
@@ -143,5 +135,6 @@ module.exports = function(grunt) {
   // ==========================================================================
   // HELPERS
   // ==========================================================================
+
 
 };
