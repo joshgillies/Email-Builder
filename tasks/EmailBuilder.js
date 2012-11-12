@@ -36,20 +36,19 @@ module.exports = function(grunt) {
         done = this.async;
 
     //console.log(this)
-    
-    this.files = helpers.normalizeMultiTaskFiles(this.data, this.target); 
+
+    this.files = helpers.normalizeMultiTaskFiles(this.data, this.target);
 
     console.log(helpers.findBasePath(this.files, this.target));
 
     grunt.util.async.forEachSeries(this.files, function(file, next) {
       var inline_css = file.src,
-          html = file.dest
+          html = file.dest,
+          output = grunt.file.read(html), // HTML
+          inline = grunt.file.read(inline_css); // CSS to be inline;
 
       console.log(inline_css);
       console.log(html);
-
-      var output = grunt.file.read(html), // HTML
-          inline = grunt.file.read(inline_css); // CSS to be inline;
 
       less.render(inline, function (e, css) {
          inline = css;
@@ -75,14 +74,16 @@ module.exports = function(grunt) {
 
 
       if (options.litmus) {
-        grunt.util.async.series([
-          sendLitmus(output, title),
-          next()
-        ]);
+        //grunt.util.async.series([
+          sendLitmus(output, title, function(){
+            console.log();
+            next()
+          })
+        //]);
       } else {
-        next(); 
+        next();
       }
-   
+
     });
 
     function sendLitmus(data, title, callback) {
@@ -98,7 +99,7 @@ module.exports = function(grunt) {
           accountUrl = options.litmus.url;
 
       var command = 'curl -i -X POST -u '+username+':'+password+' -H \'Accept: application/xml\' -H \'Content-Type: application/xml\' '+accountUrl+'/emails.xml -d @data.xml';
-      
+
       var cm = require('child_process').exec,
           fs = require('fs');
 
@@ -109,8 +110,8 @@ module.exports = function(grunt) {
         fs.unlinkSync('data.xml');
         done();
       });
-      
-      callback(null, 'Done')
+
+      callback(null, 'Done');
     }
 
     //Application XMl Builder
